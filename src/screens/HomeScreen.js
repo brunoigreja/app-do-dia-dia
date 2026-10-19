@@ -1,5 +1,5 @@
-import React from 'react';
-import { StyleSheet, ScrollView, SafeAreaView } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, ScrollView, SafeAreaView, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { colors } from '../constants/colors';
 import { useDiario } from '../hooks/useDiario';
@@ -9,15 +9,22 @@ import ResumoCard from '../components/ResumoCard';
 import RotinaCard from '../components/RotinaCard';
 import CuidadosCard from '../components/CuidadosCard';
 import MenteCard from '../components/MenteCard';
+import AvaliacaoDiaCard from '../components/AvaliacaoDiaCard';
 import SemanaGraficoCard from '../components/SemanaGraficoCard';
 import AcoesCard from '../components/AcoesCard';
+import NavigationBar from '../components/NavigationBar';
 
 export default function HomeScreen() {
+  const [abaAtiva, setAbaAtiva] = useState('rotina');
+
   const {
     dataAtual,
     setDataAtual,
     dias,
     diaAtualDados,
+    blocosAtuais,
+    salvarBloco,
+    removerBloco,
     mostrarDatePicker,
     setMostrarDatePicker,
     atualizarDiaAtual,
@@ -25,6 +32,7 @@ export default function HomeScreen() {
     editarBloco,
     mudarAgua,
     escolherHumor,
+    avaliarDia,
     limparDiaAtual,
     copiarResumoDia,
   } = useDiario();
@@ -32,6 +40,7 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" backgroundColor={colors.primary} />
+
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* CABEÇALHO E NAVEGAÇÃO DE DATAS */}
         <Header
@@ -41,43 +50,73 @@ export default function HomeScreen() {
           setMostrarDatePicker={setMostrarDatePicker}
         />
 
-        {/* RESUMO GERAL DO DIA */}
-        <ResumoCard dadosDia={diaAtualDados} />
+        {/* ABA 1: ROTINA */}
+        {abaAtiva === 'rotina' && (
+          <View>
+            <ResumoCard dadosDia={diaAtualDados} blocos={blocosAtuais} />
+            <RotinaCard
+              blocos={blocosAtuais}
+              dadosDia={diaAtualDados}
+              onAlternarBloco={alternarBloco}
+              onEditarBloco={editarBloco}
+              onSalvarBloco={salvarBloco}
+              onRemoverBloco={removerBloco}
+            />
+            <AcoesCard
+              onCopiarResumo={copiarResumoDia}
+              onLimparDia={limparDiaAtual}
+            />
+          </View>
+        )}
 
-        {/* ROTINA / BLOCOS DO DIA */}
-        <RotinaCard
-          dadosDia={diaAtualDados}
-          onAlternarBloco={alternarBloco}
-          onEditarBloco={editarBloco}
-        />
+        {/* ABA 2: CUIDADOS */}
+        {abaAtiva === 'cuidados' && (
+          <View>
+            <CuidadosCard
+              dadosDia={diaAtualDados}
+              onMudarAgua={mudarAgua}
+              onAtualizarDia={atualizarDiaAtual}
+              onEscolherHumor={escolherHumor}
+            />
+          </View>
+        )}
 
-        {/* CUIDADOS PESSOAIS (Água, Sono, Humor, Remédios) */}
-        <CuidadosCard
-          dadosDia={diaAtualDados}
-          onMudarAgua={mudarAgua}
-          onAtualizarDia={atualizarDiaAtual}
-          onEscolherHumor={escolherHumor}
-        />
+        {/* ABA 3: MENTE */}
+        {abaAtiva === 'mente' && (
+          <View>
+            <MenteCard
+              dadosDia={diaAtualDados}
+              onAtualizarDia={atualizarDiaAtual}
+            />
+          </View>
+        )}
 
-        {/* CABEÇA E CORAÇÃO (Prioridades, Gratidão, Notas) */}
-        <MenteCard
-          dadosDia={diaAtualDados}
-          onAtualizarDia={atualizarDiaAtual}
-        />
-
-        {/* HISTÓRICO / GRÁFICO DOS ÚLTIMOS 7 DIAS */}
-        <SemanaGraficoCard
-          dataAtual={dataAtual}
-          dias={dias}
-          onSelecionarData={setDataAtual}
-        />
-
-        {/* BOTÕES DE AÇÃO E RODAPÉ */}
-        <AcoesCard
-          onCopiarResumo={copiarResumoDia}
-          onLimparDia={limparDiaAtual}
-        />
+        {/* ABA 4: AVALIAÇÃO */}
+        {abaAtiva === 'avaliacao' && (
+          <View>
+            <AvaliacaoDiaCard
+              dadosDia={diaAtualDados}
+              onAvaliarDia={avaliarDia}
+              blocos={blocosAtuais}
+            />
+            <SemanaGraficoCard
+              dataAtual={dataAtual}
+              dias={dias}
+              onSelecionarData={setDataAtual}
+            />
+            <AcoesCard
+              onCopiarResumo={copiarResumoDia}
+              onLimparDia={limparDiaAtual}
+            />
+          </View>
+        )}
       </ScrollView>
+
+      {/* BARRA DE NAVEGAÇÃO INFERIOR */}
+      <NavigationBar
+        abaAtiva={abaAtiva}
+        onMudarAba={setAbaAtiva}
+      />
     </SafeAreaView>
   );
 }
@@ -89,6 +128,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingBottom: 40,
+    paddingBottom: 20,
   },
 });
+

@@ -67,22 +67,58 @@ export async function buscarDia(data) {
 /**
  * Busca dados de uma lista de datas (para carregar o gráfico da semana)
  */
-export async function buscarMultiplosDias(datas) {
+export function buscarMultiplosDias(datas) {
   try {
     const promessas = datas.map(async (d) => {
       const dados = await buscarDia(d);
       return { data: d, dados };
     });
-    const resultados = await Promise.all(promessas);
-    const mapa = {};
-    resultados.forEach((item) => {
-      if (item.dados) {
-        mapa[item.data] = item.dados;
-      }
+    return Promise.all(promessas).then((resultados) => {
+      const mapa = {};
+      resultados.forEach((item) => {
+        if (item.dados) {
+          mapa[item.data] = item.dados;
+        }
+      });
+      return mapa;
     });
-    return mapa;
   } catch (erro) {
     console.error('Erro ao buscar múltiplos dias:', erro);
-    return {};
+    return Promise.resolve({});
   }
 }
+
+/**
+ * Escuta em tempo real a rotina padrão configurada pelo usuário
+ */
+export function escutarRotinaPadrao(onSucesso, onError) {
+  const docRef = doc(db, 'config', 'rotina');
+  return onSnapshot(
+    docRef,
+    (docSnap) => {
+      if (docSnap.exists() && docSnap.data().blocos) {
+        onSucesso(docSnap.data().blocos);
+      } else {
+        onSucesso(null);
+      }
+    },
+    (erro) => {
+      console.error('Erro ao escutar rotina padrão:', erro);
+      if (onError) onError(erro);
+    }
+  );
+}
+
+/**
+ * Salva a rotina padrão no Firestore
+ */
+export async function salvarRotinaPadrao(blocos) {
+  try {
+    const docRef = doc(db, 'config', 'rotina');
+    await setDoc(docRef, { blocos }, { merge: true });
+  } catch (erro) {
+    console.error('Erro ao salvar rotina padrão:', erro);
+    throw erro;
+  }
+}
+

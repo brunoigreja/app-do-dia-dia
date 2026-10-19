@@ -2,31 +2,50 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Alert } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { hoje, somarDias, dataBonita } from '../utils/dateUtils';
-import { criarDiaVazio, calcularPorcentagem } from '../utils/calculations';
+import {
+  criarDiaVazio,
+  calcularPorcentagem,
+  calcularScoreDia,
+  obterClassificacaoScore,
+} from '../utils/calculations';
 import { BLOCOS_PADRAO, HUMORES } from '../constants/routine';
 import {
   escutarDia,
   salvarDia,
   deletarDia,
   buscarMultiplosDias,
+  escutarRotinaPadrao,
+  salvarRotinaPadrao,
 } from '../services/diarioService';
 
 export function useDiario() {
   const [dias, setDias] = useState({});
   const [dataAtual, setDataAtual] = useState(hoje());
   const [mostrarDatePicker, setMostrarDatePicker] = useState(false);
+  const [rotinaPadrao, setRotinaPadrao] = useState(BLOCOS_PADRAO);
+
+  // Escuta alterações na rotina padrão salva pelo usuário
+  useEffect(() => {
+    const unsubRotina = escutarRotinaPadrao((blocosSalvos) => {
+      if (blocosSalvos && Array.isArray(blocosSalvos) && blocosSalvos.length > 0) {
+        setRotinaPadrao(blocosSalvos);
+      }
+    });
+
+    return () => unsubRotina();
+  }, []);
 
   // Escuta alterações em tempo real do Firestore para o dia selecionado
   useEffect(() => {
     const unsubscribe = escutarDia(dataAtual, (dados) => {
       setDias((prev) => ({
         ...prev,
-        [dataAtual]: dados || criarDiaVazio(),
+        [dataAtual]: dados || criarDiaVazio(rotinaPadrao),
       }));
     });
 
     return () => unsubscribe();
-  }, [dataAtual]);
+  }, [dataAtual, rotinaPadrao]);
 
   // Carrega os últimos 7 dias para exibir o gráfico da semana preenchido
   useEffect(() => {
@@ -41,8 +60,20 @@ export function useDiario() {
 
   // Dados do dia atual (ou estrutura padrão vazia)
   const diaAtualDados = useMemo(() => {
-    return dias[dataAtual] || criarDiaVazio();
-  }, [dias, dataAtual]);
+    return dias[dataAtual] || criarDiaVazio(rotinaPadrao);
+  }, [dias, dataAtual, rotinaPadrao]);
+
+  // Lista de blocos atual do dia (personalizada para o dia ou a rotina padrão)
+  const blocosAtuais = useMemo(() => {
+    if (
+      diaAtualDados?.blocosLista &&
+      Array.isArray(diaAtualDados.blocosLista) &&
+      diaAtualDados.blocosLista.length > 0
+    ) {
+      return diaAtualDados.blocosLista;
+    }
+    return rotinaPadrao;
+  }, [diaAtualDados, rotinaPadrao]);
 
   // Atualização genérica de atributos do dia
   const atualizarDiaAtual = useCallback(
@@ -79,6 +110,83 @@ export function useDiario() {
     [diaAtualDados, atualizarDiaAtual]
   );
 
+  // Salvar/Editar uma atividade (bloco) da rotina
+  const salvarBloco = useCallback(
+    async (blocoEditado, aplicarComoPadrao = true) => {
+      const listaAtual = [...blocosAtuais];
+      const index = listaAtual.findIndex((b) => b.id === blocoEditado.id);
+
+      let novaLista;
+      const novoId = blocoEditado.id || `bloco_${Date.now()}`;
+      const blocoFormatado = { ...blocoEditado, id: novoId };
+
+      if (index >= 0) {
+        // Atualiza bloco existente
+        novaLista = [...listaAtual];
+        novaLista[index] = blocoFormatado;
+      } else {
+        // Adiciona novo bloco
+        novaLista = [...listaAtual, blocoFormatado];
+      }
+
+      // Atualiza os registros do dia mantendo o estado de feito/nota
+      const blocosDia = { ...(diaAtualDados.blocos || {}) };
+      if (!blocosDia[novoId]) {
+        blocosDia[novoId] = {
+          feito: false,
+          ini: blocoFormatado.ini || '',
+          fim: blocoFormatado.fim || '',
+          nota: '',
+        };
+      } else {
+        blocosDia[novoId] = {
+          ...blocosDia[novoId],
+          ini: blocoFormatado.ini ?? blocosDia[novoId].ini,
+          fim: blocoFormatado.fim ?? blocosDia[novoId].fim,
+        };
+      }
+
+      await atualizarDiaAtual({
+        blocosLista: novaLista,
+        blocos: blocosDia,
+      });
+
+      if (aplicarComoPadrao) {
+        try {
+          await salvarRotinaPadrao(novaLista);
+          setRotinaPadrao(novaLista);
+        } catch (e) {
+          console.error('Erro ao atualizar rotina padrão:', e);
+        }
+      }
+    },
+    [blocosAtuais, diaAtualDados, atualizarDiaAtual]
+  );
+
+  // Remover uma atividade (bloco) da rotina
+  const removerBloco = useCallback(
+    async (blocoId, aplicarComoPadrao = true) => {
+      const novaLista = blocosAtuais.filter((b) => b.id !== blocoId);
+      const blocosDia = { ...(diaAtualDados.blocos || {}) };
+      delete blocosDia[blocoId];
+
+      await atualizarDiaAtual({
+        blocosLista: novaLista,
+        blocos: blocosDia,
+      });
+
+      if (aplicarComoPadrao) {
+        try {
+          await salvarRotinaPadrao(novaLista);
+          setRotinaPadrao(novaLista);
+        } catch (e) {
+          console.error('Erro ao atualizar rotina padrão:', e);
+        }
+      }
+    },
+    [blocosAtuais, diaAtualDados, atualizarDiaAtual]
+  );
+
   // Cuidados pessoais
   const mudarAgua = useCallback(
     (delta) => {
@@ -94,6 +202,19 @@ export function useDiario() {
       atualizarDiaAtual({ humor: novoHumor });
     },
     [diaAtualDados.humor, atualizarDiaAtual]
+  );
+
+  // Avaliação pessoal do dia
+  const avaliarDia = useCallback(
+    (notaPessoal, reflexao) => {
+      const avaliacao = {
+        ...(diaAtualDados.avaliacao || {}),
+        notaPessoal: notaPessoal !== undefined ? notaPessoal : (diaAtualDados.avaliacao?.notaPessoal || 0),
+        reflexao: reflexao !== undefined ? reflexao : (diaAtualDados.avaliacao?.reflexao || ''),
+      };
+      atualizarDiaAtual({ avaliacao });
+    },
+    [diaAtualDados.avaliacao, atualizarDiaAtual]
   );
 
   // Deletar / Limpar dia
@@ -122,12 +243,20 @@ export function useDiario() {
 
   // Copiar resumo do dia
   const copiarResumoDia = useCallback(async () => {
-    const pct = calcularPorcentagem(diaAtualDados);
-    const linhas = [`Diário do dia — ${dataBonita(dataAtual)}`, `Concluído: ${pct}% da rotina`, ''];
+    const pct = calcularPorcentagem(diaAtualDados, blocosAtuais);
+    const score = calcularScoreDia(diaAtualDados, blocosAtuais);
+    const classif = obterClassificacaoScore(score);
 
-    BLOCOS_PADRAO.forEach((b) => {
+    const linhas = [
+      `Diário do dia — ${dataBonita(dataAtual)}`,
+      `Score do dia: ${score}/100 (${classif.emoji} ${classif.label})`,
+      `Concluído: ${pct}% da rotina`,
+      '',
+    ];
+
+    blocosAtuais.forEach((b) => {
       const x = diaAtualDados.blocos?.[b.id] || {};
-      const horario = x.ini + (x.fim ? `–${x.fim}` : '');
+      const horario = (x.ini || b.ini) + ((x.fim || b.fim) ? `–${x.fim || b.fim}` : '');
       linhas.push(`${x.feito ? '✔ ' : '✘ '}${b.nome} (${horario})${x.nota ? ' — ' + x.nota : ''}`);
     });
 
@@ -143,15 +272,26 @@ export function useDiario() {
     if (diaAtualDados.gratidao) linhas.push(`Gratidão: ${diaAtualDados.gratidao}`);
     if (diaAtualDados.notas) linhas.push(`Notas: ${diaAtualDados.notas}`);
 
+    const notaPessoal = diaAtualDados.avaliacao?.notaPessoal;
+    const reflexao = diaAtualDados.avaliacao?.reflexao;
+    if (notaPessoal || reflexao) {
+      linhas.push('');
+      if (notaPessoal) linhas.push(`Avaliação pessoal: ${notaPessoal}/10 ⭐`);
+      if (reflexao) linhas.push(`Reflexão: ${reflexao}`);
+    }
+
     await Clipboard.setStringAsync(linhas.join('\n'));
     Alert.alert('Copiado!', 'O resumo do dia foi copiado para a área de transferência.');
-  }, [dataAtual, diaAtualDados]);
+  }, [dataAtual, diaAtualDados, blocosAtuais]);
 
   return {
     dataAtual,
     setDataAtual,
     dias,
     diaAtualDados,
+    blocosAtuais,
+    salvarBloco,
+    removerBloco,
     mostrarDatePicker,
     setMostrarDatePicker,
     atualizarDiaAtual,
@@ -159,6 +299,7 @@ export function useDiario() {
     editarBloco,
     mudarAgua,
     escolherHumor,
+    avaliarDia,
     limparDiaAtual,
     copiarResumoDia,
   };

@@ -11,7 +11,7 @@ export default function AcoesCard({ onCopiarResumo, onLimparDia }) {
           onPress={onCopiarResumo}
           activeOpacity={0.8}
         >
-          <Text style={styles.btnAcaoTexto}>Copiar resumo do dia</Text>
+          <Text style={styles.btnAcaoTexto}>Salvar resumo do dia</Text>
         </TouchableOpacity>
 
         <TouchableOpacity

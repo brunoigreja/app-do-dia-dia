@@ -3,7 +3,13 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-nativ
 import { colors } from '../constants/colors';
 import { duracaoMin, formatarHoras } from '../utils/calculations';
 
-export default function BlocoItem({ bloco, dadosBloco, onAlternar, onEditar }) {
+export default function BlocoItem({
+  bloco,
+  dadosBloco,
+  onAlternar,
+  onEditar,
+  onEditarAtividade,
+}) {
   const estaFeito = !!dadosBloco?.feito;
   const ini = dadosBloco?.ini ?? bloco.ini;
   const fim = dadosBloco?.fim ?? bloco.fim;
@@ -34,19 +40,34 @@ export default function BlocoItem({ bloco, dadosBloco, onAlternar, onEditar }) {
         estaFeito && styles.blocoFeito,
       ]}
     >
-      <TouchableOpacity
-        style={styles.blocoTopo}
-        onPress={() => onAlternar(bloco.id)}
-        activeOpacity={0.7}
-      >
-        <Text style={styles.checkboxEmoji}>{estaFeito ? '✅' : '⬜'}</Text>
-        <Text style={[styles.blocoNome, estaFeito && styles.textoRiscado]}>
-          {bloco.icone} {bloco.nome}
-        </Text>
-        {duracao > 0 && (
-          <Text style={styles.duracaoBadge}>{formatarHoras(duracao)}</Text>
-        )}
-      </TouchableOpacity>
+      <View style={styles.blocoTopoContainer}>
+        <TouchableOpacity
+          style={styles.blocoTopo}
+          onPress={() => onAlternar(bloco.id)}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.checkboxEmoji}>{estaFeito ? '✅' : '⬜'}</Text>
+          <Text style={[styles.blocoNome, estaFeito && styles.textoRiscado]}>
+            {bloco.icone} {bloco.nome}
+          </Text>
+        </TouchableOpacity>
+
+        <View style={styles.topoDireita}>
+          {duracao > 0 && (
+            <Text style={styles.duracaoBadge}>{formatarHoras(duracao)}</Text>
+          )}
+          {onEditarAtividade && (
+            <TouchableOpacity
+              style={styles.btnEditarAtividade}
+              onPress={() => onEditarAtividade(bloco)}
+              activeOpacity={0.6}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={styles.iconeEditar}>✏️</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
 
       <View style={styles.horariosRow}>
         <View style={styles.horarioInputWrap}>
@@ -93,9 +114,29 @@ const styles = StyleSheet.create({
   blocoFeito: {
     backgroundColor: colors.blocoFeitoBg,
   },
-  blocoTopo: {
+  blocoTopoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  blocoTopo: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  topoDireita: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  btnEditarAtividade: {
+    padding: 4,
+    borderRadius: 8,
+    backgroundColor: 'rgba(30, 58, 107, 0.08)',
+  },
+  iconeEditar: {
+    fontSize: 13,
   },
   checkboxEmoji: {
     fontSize: 18,

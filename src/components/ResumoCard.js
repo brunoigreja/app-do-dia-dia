@@ -9,17 +9,18 @@ import {
   obterMensagemStatus,
 } from '../utils/calculations';
 
-export default function ResumoCard({ dadosDia }) {
-  const concluidas = BLOCOS_PADRAO.filter((b) => dadosDia?.blocos?.[b.id]?.feito).length;
-  const total = BLOCOS_PADRAO.length;
+export default function ResumoCard({ dadosDia, blocos }) {
+  const listaBlocos = blocos || dadosDia?.blocosLista || BLOCOS_PADRAO;
+  const concluidas = listaBlocos.filter((b) => dadosDia?.blocos?.[b.id]?.feito).length;
+  const total = listaBlocos.length;
 
-  const focoFeito = calcularSomaTipo(dadosDia, 'foco', true);
-  const focoTotal = calcularSomaTipo(dadosDia, 'foco', false);
+  const focoFeito = calcularSomaTipo(dadosDia, 'foco', true, listaBlocos);
+  const focoTotal = calcularSomaTipo(dadosDia, 'foco', false, listaBlocos);
 
-  const treinoFeito = calcularSomaTipo(dadosDia, 'treino', true);
-  const treinoTotal = calcularSomaTipo(dadosDia, 'treino', false);
+  const treinoFeito = calcularSomaTipo(dadosDia, 'treino', true, listaBlocos);
+  const treinoTotal = calcularSomaTipo(dadosDia, 'treino', false, listaBlocos);
 
-  const pct = calcularPorcentagem(dadosDia);
+  const pct = calcularPorcentagem(dadosDia, listaBlocos);
   const fraseStatus = obterMensagemStatus(pct);
 
   return (
