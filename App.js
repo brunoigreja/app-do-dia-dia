@@ -14,6 +14,34 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Clipboard from 'expo-clipboard';
+import { doc, setDoc, getDoc } from "firebase/firestore";
+import { db } from "./firebaseConfig";
+
+// 📥 CARREGAR DADOS DE UMA DATA
+const carregarDiaDoFirebase = async (data) => {
+  try {
+    const docRef = doc(db, "diarios", data); // guarda na coleção 'diarios' com a chave 'YYYY-MM-DD'
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      return docSnap.data();
+    } else {
+      return criarDiaVazio();
+    }
+  } catch (e) {
+    console.error("Erro ao carregar do Firebase:", e);
+  }
+};
+
+// 📤 SALVAR DADOS
+const salvarDiaNoFirebase = async (data, dadosDoDia) => {
+  try {
+    const docRef = doc(db, "diarios", data);
+    await setDoc(docRef, dadosDoDia, { merge: true });
+  } catch (e) {
+    console.error("Erro ao salvar no Firebase:", e);
+  }
+};
 
 // Configuração padrão da rotina
 const BLOCOS_PADRAO = [
