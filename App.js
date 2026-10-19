@@ -11,37 +11,10 @@ import {
   SafeAreaView,
   Platform,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Clipboard from 'expo-clipboard';
-import { doc, setDoc, getDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc, deleteDoc, onSnapshot } from "firebase/firestore";
 import { db } from "./firebaseConfig";
-
-// 📥 CARREGAR DADOS DE UMA DATA
-const carregarDiaDoFirebase = async (data) => {
-  try {
-    const docRef = doc(db, "diarios", data); // guarda na coleção 'diarios' com a chave 'YYYY-MM-DD'
-    const docSnap = await getDoc(docRef);
-
-    if (docSnap.exists()) {
-      return docSnap.data();
-    } else {
-      return criarDiaVazio();
-    }
-  } catch (e) {
-    console.error("Erro ao carregar do Firebase:", e);
-  }
-};
-
-// 📤 SALVAR DADOS
-const salvarDiaNoFirebase = async (data, dadosDoDia) => {
-  try {
-    const docRef = doc(db, "diarios", data);
-    await setDoc(docRef, dadosDoDia, { merge: true });
-  } catch (e) {
-    console.error("Erro ao salvar no Firebase:", e);
-  }
-};
 
 // Configuração padrão da rotina
 const BLOCOS_PADRAO = [
@@ -123,25 +96,35 @@ export default function App() {
   const [dataAtual, setDataAtual] = useState(hoje());
   const [mostrarDatePicker, setMostrarDatePicker] = useState(false);
 
-  // Carregar dados salvos ao iniciar
+  // Escuta alterações em tempo real do Firebase Firestore para o dia selecionado
   useEffect(() => {
-    (async () => {
-      try {
-        const json = await AsyncStorage.getItem('@diario_do_dia');
-        if (json) setDias(JSON.parse(json));
-      } catch (e) {
-        console.error(e);
+    const docRef = doc(db, 'diarios', dataAtual);
+    
+    // Inscreve para atualizações em tempo real
+    const unsubscribe = onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setDias((prev) => ({ ...prev, [dataAtual]: docSnap.data() }));
+      } else {
+        setDias((prev) => ({ ...prev, [dataAtual]: criarDiaVazio() }));
       }
-    })();
-  }, []);
+    }, (error) => {
+      console.error("Erro ao escutar dados do Firebase:", error);
+    });
 
-  // Salvar sempre que "dias" mudar
-  const salvarDados = async (novosDias) => {
+    return () => unsubscribe();
+  }, [dataAtual]);
+
+  // Salvar alterações diretamente no Firebase
+  const salvarDadosFirebase = async (novosDias) => {
     setDias(novosDias);
     try {
-      await AsyncStorage.setItem('@diario_do_dia', JSON.stringify(novosDias));
+      const dadosDiaAtual = novosDias[dataAtual];
+      if (dadosDiaAtual) {
+        const docRef = doc(db, 'diarios', dataAtual);
+        await setDoc(docRef, dadosDiaAtual, { merge: true });
+      }
     } catch (e) {
-      console.error(e);
+      console.error('Erro ao salvar no Firebase:', e);
     }
   };
 
@@ -149,7 +132,7 @@ export default function App() {
 
   const atualizarDiaAtual = (novosAtributos) => {
     const atualizado = { ...diaAtualDados, ...novosAtributos };
-    salvarDados({ ...dias, [dataAtual]: atualizado });
+    salvarDadosFirebase({ ...dias, [dataAtual]: atualizado });
   };
 
   // Cálculos de progresso
@@ -201,10 +184,18 @@ export default function App() {
       {
         text: 'Limpar',
         style: 'destructive',
-        onPress: () => {
-          const novosDias = { ...dias };
-          delete novosDias[dataAtual];
-          salvarDados(novosDias);
+        onPress: async () => {
+          try {
+            // Deleta o registro do Firebase
+            const docRef = doc(db, 'diarios', dataAtual);
+            await deleteDoc(docRef);
+
+            const novosDias = { ...dias };
+            delete novosDias[dataAtual];
+            setDias(novosDias);
+          } catch (e) {
+            console.error('Erro ao deletar dia do Firebase:', e);
+          }
         },
       },
     ]);
@@ -516,7 +507,7 @@ export default function App() {
         </View>
 
         <Text style={styles.rodape}>
-          Seus dados ficam salvos offline no próprio aparelho.
+          Seus dados estão sincronizados com a nuvem (Firebase).
         </Text>
       </ScrollView>
     </SafeAreaView>
