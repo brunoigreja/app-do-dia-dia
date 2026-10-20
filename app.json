@@ -1,24 +1,24 @@
 {
   "expo": {
-    "name": "app-do-dia-dia",
+    "name": "Diário do dia",
     "slug": "app-do-dia-dia",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/capa1.png",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundColor": "#002973",
+        "foregroundImage": "./assets/capa1.png",
+        "backgroundImage": "./assets/capa1.png",
+        "monochromeImage": "./assets/capa1.png"
       }
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/capa1.png"
     },
     "plugins": [
       "@react-native-community/datetimepicker"
