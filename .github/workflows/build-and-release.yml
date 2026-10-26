@@ -13,6 +13,9 @@ on:
         required: false
         default: ''
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build APK com EAS
@@ -24,26 +27,35 @@ jobs:
       - name: Configurar Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '20'
           cache: 'npm'
 
       - name: Instalar dependências
         run: npm ci
 
-      - name: Instalar EAS CLI
-        run: npm install -g eas-cli
-
-      - name: Build APK (preview)
+      - name: Configurar Expo e EAS
         uses: expo/expo-github-action@v8
         with:
           expo-version: latest
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Executar build EAS
-        run: eas build --platform android --profile preview --non-interactive --output ./build/app-do-dia-dia.apk
+      - name: Build APK no EAS Cloud
+        run: |
+          eas build --platform android --profile preview --non-interactive --wait --json > build_output.json
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Baixar APK gerado
+        run: |
+          APK_URL=$(node -p 'const data = require("./build_output.json"); (Array.isArray(data) ? data[0] : data).artifacts?.applicationArchiveUrl || ""')
+          if [ -z "$APK_URL" ]; then
+            echo "Erro: URL do APK não encontrada na saída do EAS!"
+            cat build_output.json
+            exit 1
+          fi
+          echo "Baixando APK de: $APK_URL"
+          curl -L -o ./app-do-dia-dia.apk "$APK_URL"
 
       - name: Determinar versão da tag
         id: versao
@@ -72,8 +84,8 @@ jobs:
             ---
             **Commit:** ${{ github.sha }}
             **Branch:** ${{ github.ref_name }}
-          files: ./build/app-do-dia-dia.apk
+          files: ./app-do-dia-dia.apk
           draft: false
           prerelease: false
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
