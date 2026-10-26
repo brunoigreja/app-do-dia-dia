@@ -1,0 +1,79 @@
+name: Build APK e Publicar Release
+
+on:
+  push:
+    branches:
+      - master
+    paths-ignore:
+      - '**.md'
+  workflow_dispatch:
+    inputs:
+      version_tag:
+        description: 'Tag da release (ex: v1.0.1)'
+        required: false
+        default: ''
+
+jobs:
+  build:
+    name: Build APK com EAS
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Instalar EAS CLI
+        run: npm install -g eas-cli
+
+      - name: Build APK (preview)
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Executar build EAS
+        run: eas build --platform android --profile preview --non-interactive --output ./build/app-do-dia-dia.apk
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Determinar versão da tag
+        id: versao
+        run: |
+          if [ -n "${{ github.event.inputs.version_tag }}" ]; then
+            echo "tag=${{ github.event.inputs.version_tag }}" >> $GITHUB_OUTPUT
+          else
+            VERSION=$(node -p "require('./package.json').version")
+            COMMIT_SHORT=$(echo "${{ github.sha }}" | cut -c1-7)
+            echo "tag=v${VERSION}-${COMMIT_SHORT}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Criar GitHub Release com APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.versao.outputs.tag }}
+          name: "Diário do Dia ${{ steps.versao.outputs.tag }}"
+          body: |
+            ## 📱 Diário do Dia — ${{ steps.versao.outputs.tag }}
+
+            ### Como instalar no Android
+            1. Baixe o arquivo `app-do-dia-dia.apk` abaixo
+            2. No seu Android, habilite **"Instalar apps de fontes desconhecidas"** nas configurações
+            3. Abra o APK baixado e instale
+
+            ---
+            **Commit:** ${{ github.sha }}
+            **Branch:** ${{ github.ref_name }}
+          files: ./build/app-do-dia-dia.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
