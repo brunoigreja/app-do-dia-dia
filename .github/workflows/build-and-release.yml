@@ -27,8 +27,7 @@ jobs:
       - name: Configurar Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: '22'
 
       - name: Instalar dependências
         run: npm ci
@@ -36,8 +35,8 @@ jobs:
       - name: Configurar Expo e EAS
         uses: expo/expo-github-action@v8
         with:
-          expo-version: latest
           eas-version: latest
+          packager: npm
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Build APK no EAS Cloud
