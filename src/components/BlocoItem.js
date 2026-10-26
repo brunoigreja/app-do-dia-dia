@@ -15,6 +15,7 @@ export default function BlocoItem({
   const fim = dadosBloco?.fim ?? bloco.fim;
   const nota = dadosBloco?.nota ?? '';
   const duracao = duracaoMin(ini, fim);
+  const temLembrete = bloco.lembrete !== false;
 
   // Define cor da borda esquerda baseada na categoria
   const obterCorTipo = (tipo) => {
@@ -56,6 +57,11 @@ export default function BlocoItem({
           {duracao > 0 && (
             <Text style={styles.duracaoBadge}>{formatarHoras(duracao)}</Text>
           )}
+          {fim ? (
+            <Text style={styles.lembreteBadge}>
+              {temLembrete ? '🔔' : '🔕'}
+            </Text>
+          ) : null}
           {onEditarAtividade && (
             <TouchableOpacity
               style={styles.btnEditarAtividade}
@@ -151,6 +157,10 @@ const styles = StyleSheet.create({
   textoRiscado: {
     textDecorationLine: 'line-through',
     opacity: 0.6,
+  },
+  lembreteBadge: {
+    fontSize: 13,
+    opacity: 0.7,
   },
   duracaoBadge: {
     backgroundColor: colors.primaryLight,

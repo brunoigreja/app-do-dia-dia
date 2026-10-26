@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -40,6 +41,7 @@ export default function ModalEditarBloco({
   const [ini, setIni] = useState('');
   const [fim, setFim] = useState('');
   const [aplicarPadrao, setAplicarPadrao] = useState(true);
+  const [lembrete, setLembrete] = useState(true);
 
   // Preenche dados ao abrir o modal
   useEffect(() => {
@@ -50,6 +52,7 @@ export default function ModalEditarBloco({
       setIni(blocoParaEditar.ini || '');
       setFim(blocoParaEditar.fim || '');
       setAplicarPadrao(true);
+      setLembrete(blocoParaEditar.lembrete !== false);
     } else {
       setNome('');
       setIcone('🎯');
@@ -57,6 +60,7 @@ export default function ModalEditarBloco({
       setIni('08:00');
       setFim('09:00');
       setAplicarPadrao(true);
+      setLembrete(true);
     }
   }, [blocoParaEditar, visivel]);
 
@@ -74,6 +78,7 @@ export default function ModalEditarBloco({
         tipo,
         ini: ini.trim(),
         fim: fim.trim(),
+        lembrete,
       },
       aplicarPadrao
     );
@@ -217,6 +222,21 @@ export default function ModalEditarBloco({
                   onChangeText={setFim}
                 />
               </View>
+            </View>
+
+            {/* SWITCH: LEMBRETE AO FINALIZAR */}
+            <View style={styles.linhaSwitch}>
+              <View style={{ flex: 1, paddingRight: 8 }}>
+                <Text style={styles.labelSwitch}>🔔 Lembrete ao finalizar</Text>
+                <Text style={styles.sublabelSwitch}>
+                  Notifica no horário de fim para confirmar se fez
+                </Text>
+              </View>
+              <Switch
+                value={lembrete}
+                onValueChange={setLembrete}
+                trackColor={{ false: '#767577', true: colors.primary }}
+              />
             </View>
 
             {/* SWITCH PARA SALVAR COMO PADRÃO */}
