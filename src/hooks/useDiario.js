@@ -17,8 +17,9 @@ import {
   escutarRotinaPadrao,
   salvarRotinaPadrao,
 } from '../services/diarioService';
+import { sincronizarLembretesDia, cancelarLembrete } from '../services/notificationService';
 
-export function useDiario() {
+export function useDiario(userId) {
   const [dias, setDias] = useState({});
   const [dataAtual, setDataAtual] = useState(hoje());
   const [mostrarDatePicker, setMostrarDatePicker] = useState(false);
@@ -26,37 +27,51 @@ export function useDiario() {
 
   // Escuta alterações na rotina padrão salva pelo usuário
   useEffect(() => {
-    const unsubRotina = escutarRotinaPadrao((blocosSalvos) => {
+    if (!userId) return;
+    const unsubRotina = escutarRotinaPadrao(userId, (blocosSalvos) => {
       if (blocosSalvos && Array.isArray(blocosSalvos) && blocosSalvos.length > 0) {
         setRotinaPadrao(blocosSalvos);
       }
     });
 
     return () => unsubRotina();
-  }, []);
+  }, [userId]);
 
   // Escuta alterações em tempo real do Firestore para o dia selecionado
   useEffect(() => {
-    const unsubscribe = escutarDia(dataAtual, (dados) => {
+    if (!userId) return;
+    const unsubscribe = escutarDia(userId, dataAtual, (dados) => {
+      const dadosDia = dados || criarDiaVazio(rotinaPadrao);
       setDias((prev) => ({
         ...prev,
-        [dataAtual]: dados || criarDiaVazio(rotinaPadrao),
+        [dataAtual]: dadosDia,
       }));
+
+      // Sincroniza lembretes apenas para hoje (não faz sentido para dias passados)
+      const ehHoje = dataAtual === hoje();
+      if (ehHoje) {
+        const lista =
+          dadosDia?.blocosLista?.length > 0
+            ? dadosDia.blocosLista
+            : rotinaPadrao;
+        sincronizarLembretesDia(dataAtual, lista, dadosDia?.blocos || {});
+      }
     });
 
     return () => unsubscribe();
-  }, [dataAtual, rotinaPadrao]);
+  }, [userId, dataAtual, rotinaPadrao]);
 
   // Carrega os últimos 7 dias para exibir o gráfico da semana preenchido
   useEffect(() => {
+    if (!userId) return;
     const datasSemana = [0, 1, 2, 3, 4, 5, 6].map((i) => somarDias(dataAtual, -i));
-    buscarMultiplosDias(datasSemana).then((mapaDias) => {
+    buscarMultiplosDias(userId, datasSemana).then((mapaDias) => {
       setDias((prev) => ({
         ...prev,
         ...mapaDias,
       }));
     });
-  }, [dataAtual]);
+  }, [userId, dataAtual]);
 
   // Dados do dia atual (ou estrutura padrão vazia)
   const diaAtualDados = useMemo(() => {
@@ -81,12 +96,12 @@ export function useDiario() {
       const atualizado = { ...diaAtualDados, ...novosAtributos };
       setDias((prev) => ({ ...prev, [dataAtual]: atualizado }));
       try {
-        await salvarDia(dataAtual, atualizado);
+        await salvarDia(userId, dataAtual, atualizado);
       } catch (e) {
         console.error('Erro ao sincronizar com Firebase:', e);
       }
     },
-    [diaAtualDados, dataAtual]
+    [userId, diaAtualDados, dataAtual]
   );
 
   // Ações nos blocos da rotina
@@ -94,10 +109,29 @@ export function useDiario() {
     (id) => {
       const blocos = { ...diaAtualDados.blocos };
       const blocoAtual = blocos[id] || {};
-      blocos[id] = { ...blocoAtual, feito: !blocoAtual.feito };
+      const novoFeito = !blocoAtual.feito;
+      blocos[id] = { ...blocoAtual, feito: novoFeito };
       atualizarDiaAtual({ blocos });
+
+      // Se marcou como FEITO → cancela o lembrete imediatamente
+      // Se desmarcou → reativa o lembrete (via sincronização ao salvar)
+      if (novoFeito) {
+        cancelarLembrete(dataAtual, id);
+      } else {
+        // Reativa: busca definição do bloco para reagendar
+        const blocoDefinicao = blocosAtuais.find((b) => b.id === id);
+        if (blocoDefinicao && blocoDefinicao.lembrete !== false) {
+          const ehHoje = dataAtual === hoje();
+          if (ehHoje) {
+            sincronizarLembretesDia(dataAtual, blocosAtuais, {
+              ...blocos,
+              [id]: { ...blocos[id], feito: false },
+            });
+          }
+        }
+      }
     },
-    [diaAtualDados, atualizarDiaAtual]
+    [diaAtualDados, atualizarDiaAtual, blocosAtuais, dataAtual]
   );
 
   const editarBloco = useCallback(
@@ -153,14 +187,19 @@ export function useDiario() {
 
       if (aplicarComoPadrao) {
         try {
-          await salvarRotinaPadrao(novaLista);
+          await salvarRotinaPadrao(userId, novaLista);
           setRotinaPadrao(novaLista);
         } catch (e) {
           console.error('Erro ao atualizar rotina padrão:', e);
         }
       }
+
+      // Reagenda lembretes do dia com a lista atualizada
+      if (dataAtual === hoje()) {
+        sincronizarLembretesDia(dataAtual, novaLista, blocosDia);
+      }
     },
-    [blocosAtuais, diaAtualDados, atualizarDiaAtual]
+    [blocosAtuais, diaAtualDados, atualizarDiaAtual, dataAtual, userId]
   );
 
   // Remover uma atividade (bloco) da rotina
@@ -177,14 +216,17 @@ export function useDiario() {
 
       if (aplicarComoPadrao) {
         try {
-          await salvarRotinaPadrao(novaLista);
+          await salvarRotinaPadrao(userId, novaLista);
           setRotinaPadrao(novaLista);
         } catch (e) {
           console.error('Erro ao atualizar rotina padrão:', e);
         }
       }
+
+      // Cancela lembrete do bloco removido
+      cancelarLembrete(dataAtual, blocoId);
     },
-    [blocosAtuais, diaAtualDados, atualizarDiaAtual]
+    [blocosAtuais, diaAtualDados, atualizarDiaAtual, dataAtual, userId]
   );
 
   // Cuidados pessoais
@@ -226,7 +268,7 @@ export function useDiario() {
         style: 'destructive',
         onPress: async () => {
           try {
-            await deletarDia(dataAtual);
+            await deletarDia(userId, dataAtual);
             setDias((prev) => {
               const copia = { ...prev };
               delete copia[dataAtual];
@@ -239,7 +281,7 @@ export function useDiario() {
         },
       },
     ]);
-  }, [dataAtual]);
+  }, [userId, dataAtual]);
 
   // Copiar resumo do dia
   const copiarResumoDia = useCallback(async () => {

@@ -1,19 +1,58 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, Alert } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { colors } from '../constants/colors';
 import { somarDias, hoje, paraData, paraTexto } from '../utils/dateUtils';
+import { logout } from '../services/authService';
 
 export default function Header({
+  usuario,
   dataAtual,
   onMudarData,
   mostrarDatePicker,
   setMostrarDatePicker,
 }) {
+  const nomeUsuario = usuario?.displayName || usuario?.email?.split('@')[0] || '';
+
+  const handleLogout = () => {
+    Alert.alert('Sair da conta', 'Deseja realmente sair da sua conta?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Sair',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await logout();
+          } catch (e) {
+            console.error('Erro ao sair:', e);
+            Alert.alert('Erro', 'Não foi possível desconectar.');
+          }
+        },
+      },
+    ]);
+  };
+
   return (
     <View style={styles.header}>
-      <Text style={styles.headerTitulo}>📓 Diário do dia</Text>
-      <Text style={styles.headerSubtitulo}>Planeje, marque e acompanhe seu dia.</Text>
+      <View style={styles.topoRow}>
+        <View style={styles.titulosCol}>
+          <Text style={styles.headerTitulo}>📓 Diário do dia</Text>
+          <Text style={styles.headerSubtitulo}>
+            {nomeUsuario ? `Olá, ${nomeUsuario}! 👋` : 'Planeje, marque e acompanhe seu dia.'}
+          </Text>
+        </View>
+
+        {usuario && (
+          <TouchableOpacity
+            style={styles.btnSair}
+            onPress={handleLogout}
+            activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={styles.btnSairTexto}>🚪 Sair</Text>
+          </TouchableOpacity>
+        )}
+      </View>
 
       <View style={styles.navDatas}>
         <TouchableOpacity
@@ -76,6 +115,16 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
+  topoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 14,
+  },
+  titulosCol: {
+    flex: 1,
+    marginRight: 10,
+  },
   headerTitulo: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -84,7 +133,19 @@ const styles = StyleSheet.create({
   headerSubtitulo: {
     fontSize: 13,
     color: colors.textLight,
-    marginBottom: 14,
+    marginTop: 2,
+  },
+  btnSair: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    alignSelf: 'center',
+  },
+  btnSairTexto: {
+    color: colors.white,
+    fontSize: 12,
+    fontWeight: '600',
   },
   navDatas: {
     flexDirection: 'row',

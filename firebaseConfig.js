@@ -1,5 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
+import { initializeAuth, getReactNativePersistence } from "firebase/auth";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Substitua pelas credenciais do seu console do Firebase
 const firebaseConfig = {
@@ -16,3 +18,8 @@ const app = initializeApp(firebaseConfig);
 
 // Inicializa o banco de dados Firestore
 export const db = getFirestore(app);
+
+// Inicializa o Auth com persistência via AsyncStorage (mantém login entre sessões)
+export const auth = initializeAuth(app, {
+  persistence: getReactNativePersistence(AsyncStorage),
+});

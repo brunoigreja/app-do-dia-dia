@@ -1,13 +1,27 @@
 import { doc, setDoc, getDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
 
-const COLECAO = 'diarios';
+/**
+ * Retorna a referência de um dia específico do usuário.
+ * Estrutura: /usuarios/{userId}/diarios/{data}
+ */
+function refDia(userId, data) {
+  return doc(db, 'usuarios', userId, 'diarios', data);
+}
+
+/**
+ * Retorna a referência da rotina padrão do usuário.
+ * Estrutura: /usuarios/{userId}/config/rotina
+ */
+function refRotina(userId) {
+  return doc(db, 'usuarios', userId, 'config', 'rotina');
+}
 
 /**
  * Escuta atualizações em tempo real de um dia específico
  */
-export function escutarDia(data, onSucesso, onError) {
-  const docRef = doc(db, COLECAO, data);
+export function escutarDia(userId, data, onSucesso, onError) {
+  const docRef = refDia(userId, data);
   return onSnapshot(
     docRef,
     (docSnap) => {
@@ -27,9 +41,9 @@ export function escutarDia(data, onSucesso, onError) {
 /**
  * Salva ou atualiza os dados de um dia no Firestore
  */
-export async function salvarDia(data, dados) {
+export async function salvarDia(userId, data, dados) {
   try {
-    const docRef = doc(db, COLECAO, data);
+    const docRef = refDia(userId, data);
     await setDoc(docRef, dados, { merge: true });
   } catch (erro) {
     console.error(`Erro ao salvar dados do dia ${data}:`, erro);
@@ -40,9 +54,9 @@ export async function salvarDia(data, dados) {
 /**
  * Deleta o registro de um dia no Firestore
  */
-export async function deletarDia(data) {
+export async function deletarDia(userId, data) {
   try {
-    const docRef = doc(db, COLECAO, data);
+    const docRef = refDia(userId, data);
     await deleteDoc(docRef);
   } catch (erro) {
     console.error(`Erro ao deletar dia ${data}:`, erro);
@@ -53,9 +67,9 @@ export async function deletarDia(data) {
 /**
  * Busca dados pontuais de um dia
  */
-export async function buscarDia(data) {
+export async function buscarDia(userId, data) {
   try {
-    const docRef = doc(db, COLECAO, data);
+    const docRef = refDia(userId, data);
     const docSnap = await getDoc(docRef);
     return docSnap.exists() ? docSnap.data() : null;
   } catch (erro) {
@@ -67,10 +81,10 @@ export async function buscarDia(data) {
 /**
  * Busca dados de uma lista de datas (para carregar o gráfico da semana)
  */
-export function buscarMultiplosDias(datas) {
+export function buscarMultiplosDias(userId, datas) {
   try {
     const promessas = datas.map(async (d) => {
-      const dados = await buscarDia(d);
+      const dados = await buscarDia(userId, d);
       return { data: d, dados };
     });
     return Promise.all(promessas).then((resultados) => {
@@ -91,8 +105,8 @@ export function buscarMultiplosDias(datas) {
 /**
  * Escuta em tempo real a rotina padrão configurada pelo usuário
  */
-export function escutarRotinaPadrao(onSucesso, onError) {
-  const docRef = doc(db, 'config', 'rotina');
+export function escutarRotinaPadrao(userId, onSucesso, onError) {
+  const docRef = refRotina(userId);
   return onSnapshot(
     docRef,
     (docSnap) => {
@@ -112,13 +126,12 @@ export function escutarRotinaPadrao(onSucesso, onError) {
 /**
  * Salva a rotina padrão no Firestore
  */
-export async function salvarRotinaPadrao(blocos) {
+export async function salvarRotinaPadrao(userId, blocos) {
   try {
-    const docRef = doc(db, 'config', 'rotina');
+    const docRef = refRotina(userId);
     await setDoc(docRef, { blocos }, { merge: true });
   } catch (erro) {
     console.error('Erro ao salvar rotina padrão:', erro);
     throw erro;
   }
 }
-

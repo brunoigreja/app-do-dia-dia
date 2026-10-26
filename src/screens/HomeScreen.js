@@ -14,7 +14,7 @@ import SemanaGraficoCard from '../components/SemanaGraficoCard';
 import AcoesCard from '../components/AcoesCard';
 import NavigationBar from '../components/NavigationBar';
 
-export default function HomeScreen() {
+export default function HomeScreen({ usuario }) {
   const [abaAtiva, setAbaAtiva] = useState('rotina');
 
   const {
@@ -35,7 +35,7 @@ export default function HomeScreen() {
     avaliarDia,
     limparDiaAtual,
     copiarResumoDia,
-  } = useDiario();
+  } = useDiario(usuario?.uid);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -44,6 +44,7 @@ export default function HomeScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* CABEÇALHO E NAVEGAÇÃO DE DATAS */}
         <Header
+          usuario={usuario}
           dataAtual={dataAtual}
           onMudarData={setDataAtual}
           mostrarDatePicker={mostrarDatePicker}
